@@ -104,7 +104,7 @@ int main( int argc, char *argv[] )
 
   while (true) {
     // main loop
-    uint8_t buffer[4096];
+    uint8_t buffer[4096 + 4];
     int len;
     int newsockfd;
 
@@ -121,7 +121,7 @@ int main( int argc, char *argv[] )
     do {
       int written = 0;
 
-      len = recv(newsockfd, (char*) buffer, sizeof(buffer), 0);
+      len = recv(newsockfd, (char*) buffer + 4, sizeof(buffer) - 4, 0);
 
       if ( len == SOCKET_ERROR ) {
         fprintf(stderr, "ERROR reading from socket %s\n", strerror(errno));
@@ -133,7 +133,13 @@ int main( int argc, char *argv[] )
       }
 
       // write command to TPM and read result
-      len = drivers[driver_index].drv_process(buffer, len);
+      len = drivers[driver_index].drv_process(buffer + 4, len);
+      buffer[0] = (uint8_t)(len >> 24);
+      buffer[1] = (uint8_t)(len >> 16);
+      buffer[2] = (uint8_t)(len >> 8);
+      buffer[3] = (uint8_t)(len);
+
+      len += 4;
 
       // write result to network
       while (written != len) {
