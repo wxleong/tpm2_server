@@ -134,10 +134,23 @@ int main( int argc, char *argv[] )
 
       // write command to TPM and read result
       len = drivers[driver_index].drv_process(buffer + 4, len);
-      buffer[0] = (uint8_t)(len >> 24);
-      buffer[1] = (uint8_t)(len >> 16);
-      buffer[2] = (uint8_t)(len >> 8);
-      buffer[3] = (uint8_t)(len);
+
+      {
+        uint32_t i = 1;
+        if (i & 0xF) {
+          /* big-endian */
+          buffer[0] = (uint8_t)(len >> 24);
+          buffer[1] = (uint8_t)(len >> 16);
+          buffer[2] = (uint8_t)(len >> 8);
+          buffer[3] = (uint8_t)(len);
+        } else {
+          /* little-endian */
+          buffer[3] = (uint8_t)(len >> 24);
+          buffer[2] = (uint8_t)(len >> 16);
+          buffer[1] = (uint8_t)(len >> 8);
+          buffer[0] = (uint8_t)(len);
+        }
+      }
 
       len += 4;
 
