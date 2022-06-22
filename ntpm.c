@@ -163,6 +163,61 @@ int main( int argc, char *argv[] )
       }
     } while ( len > 0 );
     shutdown(newsockfd, SHUT_RDWR);
+
+    // clean up TPM context, TPM2_FlushContext(transient objects, loaded sessions, saved sessions)
+    {
+      int i = 0;
+      int mode = 0;
+      int handleCount = 0;
+      uint8_t handles[128];
+      uint8_t cmdGetCap[] = {
+        0x80, 0x01,               // TPM_ST_NO_SESSIONS
+        0x00, 0x00, 0x00, 0x16,   // commandSize
+        0x00, 0x00, 0x01, 0x7A,   // TPM_CC_GetCapability
+        0x00, 0x00, 0x00, 0x01,   // TPM_CAP_HANDLES
+        0x80, 0x00, 0x00, 0x00,   // TRANSIENT_FIRST
+        0x00, 0x00, 0x00, 0x10    // propertyCount: 16
+      };
+      uint8_t cmdFlushContext[] = {
+        0x80, 0x01,               // TPM_ST_NO_SESSIONS
+        0x00, 0x00, 0x00, 0x0E,   // commandSize
+        0x00, 0x00, 0x01, 0x65,   // TPM_CC_FlushContext
+        0x00, 0x00, 0x00, 0x00    // TPMI_DH_CONTEXT
+      };
+
+      //for (mode = 0; mode < 3; mode++)
+      for (mode = 0; mode < 1; mode++)
+      {
+        switch (mode)
+        {
+          case 1:
+            // LOADED_SESSION_FIRST
+            cmdGetCap[14] = 0x02;
+            break;
+          case 2:
+            // ACTIVE_SESSION_FIRST
+            cmdGetCap[14] = 0x03;
+            break;
+          default:
+            // TRANSIENT_FIRST
+            break;
+        }
+
+        memcpy(buffer, cmdGetCap, sizeof(cmdGetCap));
+        len = drivers[driver_index].drv_process(buffer, sizeof(cmdGetCap));
+        memcpy(handles, buffer + 19, sizeof(handles));
+        handleCount = (int) buffer[18];
+
+        while (handleCount--)
+        {
+          memcpy(buffer, cmdFlushContext, sizeof(cmdFlushContext));
+          memcpy(buffer + 10 + i, handles + i, 4);
+          i += 4;
+
+          len = drivers[driver_index].drv_process(buffer, sizeof(cmdFlushContext));
+        }
+      }
+    }
   }
 
   shutdown(sockfd, SHUT_RDWR);
